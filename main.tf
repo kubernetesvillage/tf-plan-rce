@@ -1,5 +1,5 @@
 resource "aws_ssm_parameter" "foo" {
-  name  = "foo1"
+  name  = "floo1"
   type  = "String"
   value = "barrq1"
 }
