@@ -1,36 +1,45 @@
-name: terraform plan
+name: "Terraform Plan on PR"
 
 on:
   pull_request:
     branches:
       - main
+
 jobs:
   terraform:
+    name: "Terraform Plan"
     runs-on: ubuntu-latest
 
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      AWS_BUCKET_KEY_NAME: ${{ secrets.AWS_BUCKET_KEY_NAME }}
+      AWS_BUCKET_NAME: ${{ secrets.AWS_BUCKET_NAME }}
+
     steps:
-      # Step 1: Checkout code
-      - name: Checkout code
+      - name: Checkout Repository
         uses: actions/checkout@v3
 
-      # Step 2: Update AWS CLI
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
-        with:
-          terraform_version: latest
-
-      - name: Initialize Terraform          
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
-          AWS_BUCKET_NAME: ${{ secrets.AWS_BUCKET_NAME }} 
-          AWS_BUCKET_KEY_NAME: ${{ secrets.AWS_BUCKET_KEY_NAME }} 
+      - name: Install Terraform Manually
         run: |
-          terraform init
+          wget -O - https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+          sudo apt update && sudo apt install -y terraform
+          terraform -version  # Verify installation
+
+      - name: Debug Environment Variables
+        run: |
+          echo "AWS_BUCKET_NAME=$AWS_BUCKET_NAME"
+          echo "AWS_BUCKET_KEY_NAME=$AWS_BUCKET_KEY_NAME"
+          echo "AWS_REGION=$AWS_REGION"
+
+      - name: Initialize Terraform
+        run: |
+          terraform init \
+            -backend-config="bucket=$AWS_BUCKET_NAME" \
+            -backend-config="key=$AWS_BUCKET_KEY_NAME" \
+            -backend-config="region=$AWS_REGION"
 
       - name: Terraform Plan
         run: terraform plan -input=false
